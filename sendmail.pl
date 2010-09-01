@@ -1,3 +1,4 @@
+#$Id$
 use strict;
 use Net::SMTP::TLS;
 $|=1;

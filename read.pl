@@ -1,3 +1,4 @@
+#$Id$
 use strict;
 my $data=0;
 my ($cmd,%autodel,$got);
@@ -78,7 +79,7 @@ while(<F>)
     {
 	$sms .= $_;
     }
-    if(/Remote number.*: \"([\w-+\s\.]*)\"/)
+    if(/Remote number.*: \"([\w-+\s\.\&]*)\"/)
     {
 	$sender = $1;
 	#print "sender: $sender\n";
@@ -209,7 +210,7 @@ sub justdelete
 
 
 system("perl sendmail.pl");
-$ctr = @delete_queue;
+my $ctr = @delete_queue;
 foreach $cmd (@delete_queue)
 {
     print "\r$cmd... (left: $ctr)";
