@@ -1,5 +1,7 @@
 #$Id$
 use strict;
+use DateTime;
+
 my $data=0;
 my ($cmd,%autodel,$got);
 my ($location,$folder,$dated,$sender,$data,$sms);
@@ -9,6 +11,13 @@ my @delete_queue;
 system "mv spammed.out spammed" if(-f "spammed.out");
 
 open(F,"gammu getallsms|");
+
+my $verbose=0;
+my $ctr_friends = 0;
+my $ctr_autodel = 0;
+my $ctr_spam = 0;
+
+my $dt = DateTime->now;
 
 my $can_delete=1;
 my %friends;
@@ -35,7 +44,8 @@ open(F2,"spammers");
 while(<F2>)
 {
     chomp;
-    $spammers{$_}=1;
+    my ($senderid,$dated,$ctr) = split(/\t/);
+    $spammers{$senderid}=$ctr;
 }
 close(F2);
 
@@ -50,7 +60,7 @@ close(F2);
 
 while(<F>)
 {
-    #print $_;
+   #print $_;
     chomp;
     if(/Location (\d*), folder "(\w*)", phone memory/)
     {
@@ -69,6 +79,7 @@ while(<F>)
 	$folder = $nfolder;
 	
 	#print "$location - $folder\n";
+    print "\rspam:$ctr_spam autodel:$ctr_autodel friends:$ctr_friends";
 	
 	$data=0;
 	$sms="";
@@ -79,7 +90,7 @@ while(<F>)
     {
 	$sms .= $_;
     }
-    if(/Remote number.*: \"([\w-+\s\.\&]*)\"/)
+    if(/Remote number.*: \"([\w-+\s\.\&_]*)\"/)
     {
 	$sender = $1;
 	#print "sender: $sender\n";
@@ -115,25 +126,29 @@ sub sendmsg
 	
     $sms =~ /^(.{30})/;
     my $snip = $1;
-    print $location . "\n";
+    print $location . "\n" if($verbose>=2);
     if($friends{$sender}==1 && length $autodel{$sender} == 0)
     {
-        print "friend ($sender) ignored.\n";
+        print "friend ($sender) ignored.\n" if($verbose>=3);
+        $ctr_friends++;
         return;        
     }
 
-    if($spammers{$sender}==1)
+    if($spammers{$sender}>0)
     {
+        $spammers{$sender}++;
         savespammer($location,$sender,$dated,$sms0);
-        print "spammer ($sender) ignored.\n";
+        print "spammer ($sender) ignored.\n" if($verbose>=3);
+        $ctr_spam++;
         return;        
     }
 
     if(length $autodel{$sender}>0)
     {
-	$got = "d";
-	print "auto delete ($sender)\n";
-	#sleep(1);
+	    $got = "d";
+	    print "auto delete ($sender)\n"  if($verbose>=3);
+        $ctr_autodel++;
+	    #sleep(1);
     }
     elsif(length $book{$sender}>0)
     {
@@ -142,7 +157,7 @@ sub sendmsg
     else
     {
 	    print "\n$sender ($book{$sender}) ($location) at $dated\n\t$snip\n";
-	    print "Spam,Friend,Delete,Ok?:";
+	    print "Spam,Friend,Delete,spam and ediT sender,Ok?:";
     	$got = <>;
     }
 
@@ -160,8 +175,15 @@ sub sendmsg
         $friends{$sender}=1;
         return;
     }
-	if($got =~ /s/gi)
+	if($got =~ /s/gi || $got =~ /t/gi)
 	{
+        if($got =~ /t/gi)
+        {
+            print "\nSet sender name:";
+        	$sender = <>;
+        }
+        $spammers{$sender} = 1;
+        $ctr_spam++;
         savespammer($location,$sender,$dated,$sms0);
 	}
 }
@@ -179,16 +201,19 @@ sub savespammer
     print F2 "$sender @ $dated\n$location\n$sms\n===\n";
     close(F2);
 
+    my $ymd = $dt->ymd;
+    my $hms = $dt->hms;
+    my $dated = "$ymd $hms";
+    my $sender_ctr = $spammers{$sender};
     open(F3,">>spammers");
-    print F3 "$sender\n";
+    print F3 "$sender\t$dated\t$sender_ctr\n";
     close(F3);
 
     if($can_delete)
     {
         my $cmd = "gammu --deletesms 3 $loc ";
-        print "deleting $location ($cmd)...";
+        print "\rdeleting $location ($cmd)..." if($verbose>=2);
         push @delete_queue,$cmd;
-        print "Deleted";
     }
 
 }
@@ -202,10 +227,8 @@ sub justdelete
     my $loc = $location - 100000;
 
     my $cmd = "gammu --deletesms 3 $loc ";
-    print "deleting $location ($cmd)...";
+    print "\rdeleting $location ($cmd)..." if($verbose>=2);
     push @delete_queue,$cmd;
-    #system($cmd);  
-    print "Deleted";
 }
 
 
