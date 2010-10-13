@@ -3,12 +3,17 @@ use strict;
 use Net::SMTP::TLS;
 $|=1;
 
+open(F,"<mailbox.info");
+my $line = <F>;
+close(F);
+my ($email_user,$email_password) = split(/\|/,$line);
+
 my $mailer = new Net::SMTP::TLS(
 	'smtp.gmail.com',
 	Hello   =>      'smtp.gmail.com',
 	Port    =>      587,
-	User    =>      'mevikas@gmail.com',
-	Password=>      '25t139621k45m8');
+	User    =>      $email_user,
+	Password=>      $email_password);
 
 print "SMTP connected.\n";
 
